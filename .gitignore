@@ -1,0 +1,4 @@
+*.session
+*.session-journal
+*.json
+config.yml
