@@ -5,7 +5,7 @@ import httpx
 import datetime
 import humanfriendly
 import html
-from typing import Final, Dict, Optional, List
+from typing import Final, Dict, Optional, List, Tuple
 import yaml
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import os
@@ -92,15 +92,7 @@ async def get_device_info(device_codename: str) -> Optional[Dict[str, str]]:
         with open(devices_file, "r") as f:
             data = json.load(f)
     except FileNotFoundError:
-        devices_url = "https://raw.githubusercontent.com/BlissRoms-Devices/official-devices/main/devices.json"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(devices_url)
-            if response.status_code != 200:
-                print(f"Request failed with status code: {response.status_code}")
-                return None
-            data = json.loads(response.text)
-            with open(devices_file, "w") as f:
-                json.dump(data, f)
+        await download_devices_job()
     for device in data:
         if device['codename'] != device_codename:
             continue
@@ -146,32 +138,36 @@ async def get_gapps_build(device_codename: str) -> Optional[Dict[str, str]]:
         return build_data
     
 # Pyrogram Helper Functions
-def get_device_keyboard(device_codename: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("Vanilla Build", callback_data=f"vanilla#{device_codename}")],
-            [InlineKeyboardButton("GApps Build", callback_data=f"gapps#{device_codename}")],
-            [InlineKeyboardButton("Close", callback_data="close")],
-        ]
-    )
-
-def get_build_keyboard(device_codename: str, build_type: str, build_url: str) -> InlineKeyboardMarkup:
+def get_build_keyboard(vanilla_build_url: str, gapps_build_url: str, device_codename: str) -> Optional[InlineKeyboardMarkup]:
+    blank_keyboard = []
+    if vanilla_build_url:
+        blank_keyboard.append([InlineKeyboardButton(text=f"Download Vanilla Build ({device_codename})", url=vanilla_build_url)])
+    if gapps_build_url:
+        blank_keyboard.append([InlineKeyboardButton(text=f"Download GApps Build ({device_codename})", url=gapps_build_url)])
+    if len(blank_keyboard) > 0:
+        blank_keyboard.append([InlineKeyboardButton("Close", callback_data="close")])
+    else:
+        return None
+    
     build_keyboard = InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton(text=f"Download {build_type} ({device_codename})", url=build_url)],
-            [InlineKeyboardButton(text="GApps" if build_type == 'Vanilla' else "Vanilla", callback_data=f"gapps#{device_codename}" if build_type == 'Vanilla' else f"vanilla#{device_codename}")],
-            [InlineKeyboardButton(text="Back", callback_data=f"back#{device_codename}")],
-        ]
+        blank_keyboard
     )
     return build_keyboard
 
-def get_device_text(device_data: Optional[Dict[str, str]], device_build: Dict[str, str], build_type: str) -> str:
+def get_device_text(device_vanilla_build: Optional[Dict[str, str]], device_gapps_build: Optional[Dict[str, str]], device_data: Optional[Dict[str, str]], device_codename: str) -> Tuple[str, Optional[InlineKeyboardMarkup], bool]:
+    build_found = False
     if not device_data:
         device_text = ""
     else:
         device_text = f"<strong>Device:</strong> {device_data.get('brand')} {device_data.get('name')}\n<strong>Maintainer:</strong> {device_data.get('maintainer')}\n<strong>Support:</strong> {device_data.get('support')}\n\n"
-    device_text += f"<strong>Build Type:</strong> {build_type}\n<strong>Build Date:</strong> {device_build.get('date')}\n<strong>Build Size:</strong> {device_build.get('size')}\n<strong>Build Version:</strong> {device_build.get('version')}"
-    return device_text
+        if device_vanilla_build:
+            build_found = True
+            device_text += f"<strong>Build Type:</strong> Vanilla\n<strong>Build Date:</strong> {device_vanilla_build.get('date')}\n<strong>Build Size:</strong> {device_vanilla_build.get('size')}\n<strong>Build Version:</strong> {device_vanilla_build.get('version')}\n\n"
+        if device_gapps_build:
+            build_found = True
+            device_text += f"<strong>Build Type:</strong> GApps\n<strong>Build Date:</strong> {device_gapps_build.get('date')}\n<strong>Build Size:</strong> {device_gapps_build.get('size')}\n<strong>Build Version:</strong> {device_gapps_build.get('version')}"
+        build_keyboard = get_build_keyboard(device_vanilla_build.get('url') if device_vanilla_build is not None else None, device_gapps_build.get('url') if device_gapps_build is not None else None, device_codename)
+    return device_text, build_keyboard, build_found
 
 # Pyrogram Functions - Commands
 @app.on_message(filters=filters.command("start"))
@@ -216,9 +212,15 @@ async def bliss_msg(_: Client, message: Message) -> None:
             if device_codename not in devices_list_full.keys():
                 await message.reply_text(text="Bliss ROM for the specified device does not exist!\nUse `/list` to check the supported device list", quote=True)
             else:
-                device_data = devices_list_full.get(device_codename)
-                text: str = f"<strong>Device:</strong> {device_data.get('brand')} {device_data.get('name')}\n<strong>Maintainer:</strong> {device_data.get('maintainer')}\n<strong>Support:</strong> {device_data.get('support')}\n\nChoose an option:"
-                await message.reply_text(text=text, quote=True, reply_markup=get_device_keyboard(device_codename=device_codename), parse_mode=enums.ParseMode.HTML, disable_web_page_preview=True)
+                await _.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
+                device_gapps_build = await get_gapps_build(device_codename=device_codename)
+                device_vanilla_build = await get_vanilla_build(device_codename=device_codename)
+                device_data = await get_device_info(device_codename=device_codename)
+                device_text, build_keyboard, build_found = get_device_text(device_vanilla_build=device_vanilla_build, device_gapps_build=device_gapps_build, device_data=device_data, device_codename=device_codename)
+                if not build_found:
+                    await message.reply_text(text="Bliss ROM for the specified device does not exist!\nUse `/list` to check the supported device list", quote=True)
+                else:
+                    await message.reply_text(text=device_text, reply_markup=build_keyboard, parse_mode=enums.ParseMode.HTML, quote=True, disable_web_page_preview=True)
         else:
             await message.reply_text(text="Sorry, the device list could not be fetched!", quote=False)
 
@@ -228,38 +230,6 @@ async def close_msg(_: Client, query: CallbackQuery) -> None:
     if query.message.chat.type == enums.ChatType.PRIVATE:
         await query.message.reply_to_message.delete()
     await query.message.delete()
-
-@app.on_callback_query(filters=filters.regex(r'^v\w{6}#\w+$'))
-async def vanilla_btn(_: Client, query: CallbackQuery) -> None:
-    device_codename = query.data.split('#')[1]
-    device_build = await get_vanilla_build(device_codename=device_codename)
-    if device_build:
-        device_data = await get_device_info(device_codename=device_codename)
-        device_text = get_device_text(device_data=device_data, device_build=device_build, build_type="Vanilla")
-        await query.edit_message_text(text=device_text, reply_markup=get_build_keyboard(device_codename=device_codename, build_type='Vanilla', build_url=device_build.get('url')), parse_mode=enums.ParseMode.HTML, disable_web_page_preview=True)
-    else:
-        await query.message.edit_text(text=f"Sorry, could not fetch any vanilla build for {device_codename}\nIf you believe this is an error, please report this in our Telegram Chat!")
-
-@app.on_callback_query(filters=filters.regex(r'^g\w{4}#\w+$'))
-async def gapps_btn(_: Client, query: CallbackQuery) -> None:
-    device_codename = query.data.split('#')[1]
-    device_build = await get_gapps_build(device_codename=device_codename)
-    if device_build:
-        device_data = await get_device_info(device_codename=device_codename)
-        device_text = get_device_text(device_data=device_data, device_build=device_build, build_type="GApps")
-        await query.edit_message_text(text=device_text, reply_markup=get_build_keyboard(device_codename=device_codename, build_type='GApps', build_url=device_build.get('url')), parse_mode=enums.ParseMode.HTML, disable_web_page_preview=True)
-    else:
-        await query.message.edit_text(text=f"Sorry, could not fetch any vanilla build for {device_codename}\nIf you believe this is an error, please report this in our Telegram Chat!")
-
-@app.on_callback_query(filters=filters.regex(r'^b\w{3}#\w+$'))
-async def back_btn(_: Client, query: CallbackQuery) -> None:
-    device_codename = query.data.split('#')[1]
-    device_data = await get_device_info(device_codename=device_codename)
-    if device_data:
-        text = f"<strong>Device:</strong> {device_data.get('brand')} {device_data.get('name')}\n<strong>Maintainer:</strong> {device_data.get('maintainer')}\n<strong>Support:</strong> {device_data.get('support')}\n\nChoose an option:"
-        await query.edit_message_text(text=text, reply_markup=get_device_keyboard(device_codename=device_codename), parse_mode=enums.ParseMode.HTML, disable_web_page_preview=True)
-    else:
-        await query.message.delete()
 
 scheduler = AsyncIOScheduler()
 scheduler.add_job(func=download_devices_job, trigger="interval", hours=3, next_run_time=datetime.datetime.now(), misfire_grace_time=None)
