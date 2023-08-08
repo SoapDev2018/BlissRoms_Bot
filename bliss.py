@@ -136,25 +136,63 @@ async def get_gapps_build(device_codename: str) -> Optional[Dict[str, str]]:
             'url': device_data['url'],
         }
         return build_data
-    
+
+async def get_pixelgapps_build(device_codename: str) -> Optional[Dict[str, str]]:
+    download_url = DOWNLOAD_BASE_URL.format(device_codename, "pixelgapps")
+    build_data: Dict[str, str] = {}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(download_url)
+        if response.status_code != 200:
+            print(f"Request failed with status code: {response.status_code}")
+            return None
+        device_data = json.loads(response.text)['response'][0]
+        build_data = {
+            'date': datetime.datetime.fromtimestamp(device_data['datetime']).strftime('%d-%m-%Y'),
+            'size': humanfriendly.format_size(device_data['size']),
+            'version': device_data['version'],
+            'url': device_data['url'],
+        }
+        return build_data
+
+async def get_foss_build(device_codename: str) -> Optional[Dict[str, str]]:
+    download_url = DOWNLOAD_BASE_URL.format(device_codename, "foss")
+    build_data: Dict[str, str] = {}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(download_url)
+        if response.status_code != 200:
+            print(f"Request failed with status code: {response.status_code}")
+            return None
+        device_data = json.loads(response.text)['response'][0]
+        build_data = {
+            'date': datetime.datetime.fromtimestamp(device_data['datetime']).strftime('%d-%m-%Y'),
+            'size': humanfriendly.format_size(device_data['size']),
+            'version': device_data['version'],
+            'url': device_data['url'],
+        }
+        return build_data
+
 # Pyrogram Helper Functions
-def get_build_keyboard(vanilla_build_url: str, gapps_build_url: str, device_codename: str) -> Optional[InlineKeyboardMarkup]:
+def get_build_keyboard(vanilla_build_url: str, gapps_build_url: str, pixelgapps_build_url: str, foss_build_url: str, device_codename: str) -> Optional[InlineKeyboardMarkup]:
     blank_keyboard = []
     if vanilla_build_url:
         blank_keyboard.append([InlineKeyboardButton(text=f"Download Vanilla Build ({device_codename})", url=vanilla_build_url)])
     if gapps_build_url:
-        blank_keyboard.append([InlineKeyboardButton(text=f"Download GApps Build ({device_codename})", url=gapps_build_url)])
+        blank_keyboard.append([InlineKeyboardButton(text=f"Download Gapps Build ({device_codename})", url=gapps_build_url)])
+    if pixelgapps_build_url:
+        blank_keyboard.append([InlineKeyboardButton(text=f"Download Pixel Gapps Build ({device_codename})", url=pixelgapps_build_url)])
+    if foss_build_url:
+        blank_keyboard.append([InlineKeyboardButton(text=f"Download FOSS Build ({device_codename})", url=foss_build_url)])
     if len(blank_keyboard) > 0:
         blank_keyboard.append([InlineKeyboardButton("Close", callback_data="close")])
     else:
         return None
-    
+
     build_keyboard = InlineKeyboardMarkup(
         blank_keyboard
     )
     return build_keyboard
 
-def get_device_text(device_vanilla_build: Optional[Dict[str, str]], device_gapps_build: Optional[Dict[str, str]], device_data: Optional[Dict[str, str]], device_codename: str) -> Tuple[str, Optional[InlineKeyboardMarkup], bool]:
+def get_device_text(device_vanilla_build: Optional[Dict[str, str]], device_gapps_build: Optional[Dict[str, str]], device_pixelgapps_build: Optional[Dict[str, str]], device_foss_build: Optional[Dict[str, str]], device_data: Optional[Dict[str, str]], device_codename: str) -> Tuple[str, Optional[InlineKeyboardMarkup], bool]:
     build_found = False
     if not device_data:
         device_text = ""
@@ -166,7 +204,13 @@ def get_device_text(device_vanilla_build: Optional[Dict[str, str]], device_gapps
         if device_gapps_build:
             build_found = True
             device_text += f"<strong>Build Type:</strong> GApps\n<strong>Build Date:</strong> {device_gapps_build.get('date')}\n<strong>Build Size:</strong> {device_gapps_build.get('size')}\n<strong>Build Version:</strong> {device_gapps_build.get('version')}"
-        build_keyboard = get_build_keyboard(device_vanilla_build.get('url') if device_vanilla_build is not None else None, device_gapps_build.get('url') if device_gapps_build is not None else None, device_codename)
+        if device_pixelgapps_build:
+            build_found = True
+            device_text += f"<strong>Build Type:</strong> Pixel Gapps\n<strong>Build Date:</strong> {device_pixelgapps_build.get('date')}\n<strong>Build Size:</strong> {device_pixelgapps_build.get('size')}\n<strong>Build Version:</strong> {device_pixelgapps_build.get('version')}\n\n"
+        if device_foss_build:
+            build_found = True
+            device_text += f"<strong>Build Type:</strong> FOSS\n<strong>Build Date:</strong> {device_foss_build.get('date')}\n<strong>Build Size:</strong> {device_foss_build.get('size')}\n<strong>Build Version:</strong> {device_foss_build.get('version')}\n\n"
+        build_keyboard = get_build_keyboard(device_vanilla_build.get('url') if device_vanilla_build is not None else None, device_gapps_build.get('url') if device_gapps_build is not None else None, device_pixelgapps_build.get('url') if device_pixelgapps_build is not None else None, device_foss_build.get('url') if device_foss_build is not None else None, device_codename)
     return device_text, build_keyboard, build_found
 
 # Pyrogram Functions - Commands
@@ -216,7 +260,9 @@ async def bliss_msg(_: Client, message: Message) -> None:
                 device_gapps_build = await get_gapps_build(device_codename=device_codename)
                 device_vanilla_build = await get_vanilla_build(device_codename=device_codename)
                 device_data = await get_device_info(device_codename=device_codename)
-                device_text, build_keyboard, build_found = get_device_text(device_vanilla_build=device_vanilla_build, device_gapps_build=device_gapps_build, device_data=device_data, device_codename=device_codename)
+                device_pixelgapps_build = await get_pixelgapps_build(device_codename=device_codename)
+                device_foss_build = await get_foss_build(device_codename=device_codename)
+                device_text, build_keyboard, build_found = get_device_text(device_vanilla_build=device_vanilla_build, device_gapps_build=device_gapps_build, device_pixelgapps_build=device_pixelgapps_build, device_foss_build=device_foss_build, device_data=device_data, device_codename=device_codename)
                 if not build_found:
                     await message.reply_text(text="Bliss ROM for the specified device does not exist!\nUse `/list` to check the supported device list", quote=True)
                 else:
