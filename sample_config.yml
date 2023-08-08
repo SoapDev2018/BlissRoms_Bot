@@ -6,3 +6,4 @@ telegram:
     - 
 bliss:
   download_url: https://downloads.blissroms.org/api/v1/updater/los/{0}/{1}/
+  user_agent: 
