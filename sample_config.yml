@@ -7,3 +7,4 @@ telegram:
 bliss:
   download_url: https://downloads.blissroms.org/api/v1/updater/los/{0}/{1}/
   user_agent: 
+  default_user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.203

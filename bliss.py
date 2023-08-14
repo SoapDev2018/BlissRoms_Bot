@@ -27,6 +27,8 @@ API_HASH: Final[str] = telegram_config["api_hash"]
 BOT_TOKEN: Final[str] = telegram_config["bot_token"]
 AUTHORIZED_IDS: Final[List[int]] = [int(telegram_id) for telegram_id in telegram_config["authorized_ids"]]
 DOWNLOAD_BASE_URL: Final[str] = bliss_config["download_url"]
+RQST_USER_AGENT: Final[str] = bliss_config["user_agent"]
+DEFAULT_RQST_USER_AGENT: Final[str] = bliss_config["default_user_agent"]
 
 # Pyrogram Client
 app = Client("BlissBot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
@@ -36,8 +38,12 @@ async def download_devices_job() -> None:
     devices_file = "devices.json"
     devices_url = "https://raw.githubusercontent.com/BlissRoms-Devices/official-devices/main/devices.json"
     if os.path.isfile(devices_file):
+        if RQST_USER_AGENT:
+            headers = {"User-Agent": RQST_USER_AGENT}
+        else:
+            headers = {"User-Agent": DEFAULT_RQST_USER_AGENT}
         new_devices_file = "new_devices.json"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(headers=headers) as client:
             response = await client.get(devices_url)
             if response.status_code != 200:
                 print(f"Request failed with status code: {response.status_code}")
@@ -67,7 +73,11 @@ async def devices_list() -> Optional[Dict[str, Dict[str, str]]]:
             data = json.load(f)
     except FileNotFoundError:
         devices_url = "https://raw.githubusercontent.com/BlissRoms-Devices/official-devices/main/devices.json"
-        async with httpx.AsyncClient() as client:
+        if RQST_USER_AGENT:
+            headers = {"User-Agent": RQST_USER_AGENT}
+        else:
+            headers = {"User-Agent": DEFAULT_RQST_USER_AGENT}
+        async with httpx.AsyncClient(headers=headers) as client:
             response = await client.get(devices_url)
             if response.status_code != 200:
                 print(f"Request failed with status code: {response.status_code}")
@@ -106,7 +116,11 @@ async def get_device_info(device_codename: str) -> Optional[Dict[str, str]]:
 async def get_vanilla_build(device_codename: str) -> Optional[Dict[str, str]]:
     download_url = DOWNLOAD_BASE_URL.format(device_codename, "vanilla")
     build_data: Dict[str, str] = {}
-    async with httpx.AsyncClient() as client:
+    if RQST_USER_AGENT:
+        headers = {"User-Agent": RQST_USER_AGENT}
+    else:
+        headers = {"User-Agent": DEFAULT_RQST_USER_AGENT}
+    async with httpx.AsyncClient(headers=headers) as client:
         response = await client.get(download_url)
         if response.status_code != 200:
             print(f"Request failed with status code: {response.status_code}")
@@ -123,7 +137,11 @@ async def get_vanilla_build(device_codename: str) -> Optional[Dict[str, str]]:
 async def get_gapps_build(device_codename: str) -> Optional[Dict[str, str]]:
     download_url = DOWNLOAD_BASE_URL.format(device_codename, "gapps")
     build_data: Dict[str, str] = {}
-    async with httpx.AsyncClient() as client:
+    if RQST_USER_AGENT:
+        headers = {"User-Agent": RQST_USER_AGENT}
+    else:
+        headers = {"User-Agent": DEFAULT_RQST_USER_AGENT}
+    async with httpx.AsyncClient(headers=headers) as client:
         response = await client.get(download_url)
         if response.status_code != 200:
             print(f"Request failed with status code: {response.status_code}")
@@ -140,7 +158,11 @@ async def get_gapps_build(device_codename: str) -> Optional[Dict[str, str]]:
 async def get_pixelgapps_build(device_codename: str) -> Optional[Dict[str, str]]:
     download_url = DOWNLOAD_BASE_URL.format(device_codename, "pixelgapps")
     build_data: Dict[str, str] = {}
-    async with httpx.AsyncClient() as client:
+    if RQST_USER_AGENT:
+        headers = {"User-Agent": RQST_USER_AGENT}
+    else:
+        headers = {"User-Agent": DEFAULT_RQST_USER_AGENT}
+    async with httpx.AsyncClient(headers=headers) as client:
         response = await client.get(download_url)
         if response.status_code != 200:
             print(f"Request failed with status code: {response.status_code}")
@@ -157,7 +179,11 @@ async def get_pixelgapps_build(device_codename: str) -> Optional[Dict[str, str]]
 async def get_foss_build(device_codename: str) -> Optional[Dict[str, str]]:
     download_url = DOWNLOAD_BASE_URL.format(device_codename, "foss")
     build_data: Dict[str, str] = {}
-    async with httpx.AsyncClient() as client:
+    if RQST_USER_AGENT:
+        headers = {"User-Agent": RQST_USER_AGENT}
+    else:
+        headers = {"User-Agent": DEFAULT_RQST_USER_AGENT}
+    async with httpx.AsyncClient(headers=headers) as client:
         response = await client.get(download_url)
         if response.status_code != 200:
             print(f"Request failed with status code: {response.status_code}")
