@@ -30,7 +30,7 @@ To use the BlissRoms Telegram Bot, follow these steps:
 - To get download links for a specific device: `/bliss obiwan`
 
 ## Dependencies
-    
+
 - [Python 3.11](https://python.org)
 - [Pyrogram](https://pyrogram.org)
 - [humanfriendly](https://pypi.org/project/humanfriendly/)
@@ -51,11 +51,13 @@ To use the BlissRoms Telegram Bot, follow these steps:
 
 ## YAML Values
 
-- `api_id`: Your Telegram API_ID (from https://my.telegram.org)
-- `api_hash`: Your Telegram API_HASH (from https://my.telegram.org)
-- `bot_token`: Your bot's token (from https://telegram.dog/BotFather)
+- `api_id`: Your Telegram API_ID (from <https://my.telegram.org>)
+- `api_hash`: Your Telegram API_HASH (from <https://my.telegram.org>)
+- `bot_token`: Your bot's token (from <https://telegram.dog/BotFather>)
 - `authorized_ids`: Authorized users, who can use the `/refresh` command
-- `download_url`: BlissRoms' download URL; do not modify
+- `download_url`: BlissRoms' download URL; do not modify unless you know what you're doing!
+- `user_agent`: Custom User-Agent to send to the download server
+- `default_user_agent`: The default UA passed, if `user_agent` is not defined
 
 ## Contributing
 
