@@ -10,6 +10,7 @@ Welcome to the BlissRoms Telegram Bot project! This bot is designed to provide t
 - List officially supported devices for BlissRoms.
 - Provide download links for vanilla and gapps versions of BlissRoms from SourceForge.
 - User-friendly interface for quick access to information.
+- Auto-deletes long messages in private chats and groups (with permission) to avoid cluttering the chat.
 
 ## Getting Started
 
@@ -58,6 +59,7 @@ To use the BlissRoms Telegram Bot, follow these steps:
 - `download_url`: BlissRoms' download URL; do not modify unless you know what you're doing!
 - `user_agent`: Custom User-Agent to send to the download server
 - `default_user_agent`: The default UA passed, if `user_agent` is not defined
+- `group_ids`: Authorized Telegram chats, leave blank to allow all chats
 
 ## Contributing
 
