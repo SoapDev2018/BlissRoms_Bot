@@ -25,10 +25,11 @@ bliss_config = config_data["bliss"]
 API_ID: Final[int] = int(telegram_config["api_id"])
 API_HASH: Final[str] = telegram_config["api_hash"]
 BOT_TOKEN: Final[str] = telegram_config["bot_token"]
-AUTHORIZED_IDS: Final[List[int]] = [int(telegram_id) for telegram_id in telegram_config["authorized_ids"]]
+AUTHORIZED_IDS: Final[List[int]] = [int(telegram_id) for telegram_id in telegram_config["authorized_ids"] if telegram_id is not None]
 DOWNLOAD_BASE_URL: Final[str] = bliss_config["download_url"]
 RQST_USER_AGENT: Final[str] = bliss_config["user_agent"]
 DEFAULT_RQST_USER_AGENT: Final[str] = bliss_config["default_user_agent"]
+TELEGRAM_GROUP_IDS: Final[List[int]] = [int(group_id) for group_id in telegram_config.get("group_ids") if group_id is not None]
 
 # Pyrogram Client
 app = Client("BlissBot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
@@ -242,10 +243,16 @@ def get_device_text(device_vanilla_build: Optional[Dict[str, str]], device_gapps
 # Pyrogram Functions - Commands
 @app.on_message(filters=filters.command("start"))
 async def start_msg(_: Client, message: Message) -> None:
+    if message.chat.type in [enums.ChatType.SUPERGROUP, enums.ChatType.GROUP] and len(TELEGRAM_GROUP_IDS) > 0 and message.chat.id not in TELEGRAM_GROUP_IDS:
+        await message.reply_text("Hey there, this bot cannot be used in this group/supergroup!")
+        return
     await message.reply_text(text="Hey there, I'm Bliss Bot!\n\nUse `/help` to check the list of available commands.\nType `/bliss` {codename} to get BlissROMs for your device.", quote=True)
 
 @app.on_message(filters=filters.command("help"))
 async def help_msg(_: Client, message: Message) -> None:
+    if message.chat.type in [enums.ChatType.SUPERGROUP, enums.ChatType.GROUP] and len(TELEGRAM_GROUP_IDS) > 0 and message.chat.id not in TELEGRAM_GROUP_IDS:
+        await message.reply_text("Hey there, this bot cannot be used in this group/supergroup!")
+        return
     await message.reply_text(text="Available commands:\n\n`/bliss` {codename}: Check latest version available for your device.\n`/list`: Check the current list of officially supported devices.", quote=True)
 
 @app.on_message(filters=filters.command("refresh"))
@@ -260,6 +267,9 @@ async def refresh_msg(_: Client, message: Message) -> None:
 
 @app.on_message(filters=filters.command("list"))
 async def list_msg(_: Client, message: Message) -> None:
+    if message.chat.type in [enums.ChatType.SUPERGROUP, enums.ChatType.GROUP] and len(TELEGRAM_GROUP_IDS) > 0 and message.chat.id not in TELEGRAM_GROUP_IDS:
+        await message.reply_text("Hey there, this bot cannot be used in this group/supergroup!")
+        return
     devices_list_full = await devices_list()
     list_message = await message.reply_text(text="Please wait, loading the device list...", quote=True)
     text: str = "<strong>Device List:</strong>\n\n"
@@ -267,11 +277,20 @@ async def list_msg(_: Client, message: Message) -> None:
         for device, device_data in devices_list_full.items():
             text += f"{html.escape(device_data.get('brand'))} {html.escape(device_data.get('name'))} (<code>{html.escape(device)}</code>)\n"
         await list_message.edit_text(text=text, parse_mode=enums.ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close")]]))
+        if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+            await asyncio.sleep(10)
+            await list_message.delete()
+            bot_privileges = (await _.get_chat_member(message.chat.id, (await _.get_me()).id)).privileges
+            if bot_privileges and bot_privileges.can_delete_messages:
+                await message.delete()
     else:
         await list_message.edit_text(text="Sorry, the device list could not be fetched!")
 
 @app.on_message(filters=filters.command("bliss"))
 async def bliss_msg(_: Client, message: Message) -> None:
+    if message.chat.type in [enums.ChatType.SUPERGROUP, enums.ChatType.GROUP] and len(TELEGRAM_GROUP_IDS) > 0 and message.chat.id not in TELEGRAM_GROUP_IDS:
+        await message.reply_text("Hey there, this bot cannot be used in this group/supergroup!")
+        return
     if len(message.text.split()) < 2 and not message.reply_to_message:
         await message.reply_text(text="Please mention the device codename after `/bliss`. Eg: `/bliss Z01R`", quote=True)
         return
@@ -298,9 +317,13 @@ async def bliss_msg(_: Client, message: Message) -> None:
 
 # Pyrogram Functions - Callback Queries
 @app.on_callback_query(filters=filters.regex("close"))
-async def close_msg(_: Client, query: CallbackQuery) -> None:
+async def close_msg(bot: Client, query: CallbackQuery) -> None:
     if query.message.chat.type == enums.ChatType.PRIVATE:
         await query.message.reply_to_message.delete()
+    elif query.message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+        bot_privileges = (await bot.get_chat_member(query.message.chat.id, (await bot.get_me()).id)).privileges
+        if bot_privileges and bot_privileges.can_delete_messages:
+            await query.message.reply_to_message.delete()
     await query.message.delete()
 
 scheduler = AsyncIOScheduler()

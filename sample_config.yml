@@ -4,6 +4,8 @@ telegram:
   bot_token: 
   authorized_ids:
     - 
+  group_ids:
+    - 
 bliss:
   download_url: https://downloads.blissroms.org/api/v1/updater/los/{0}/{1}/
   user_agent: 
