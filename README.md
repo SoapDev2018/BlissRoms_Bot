@@ -32,8 +32,8 @@ To use the BlissRoms Telegram Bot, follow these steps:
 
 ## Dependencies
 
-- [Python 3.11](https://python.org)
-- [Pyrogram](https://pyrogram.org)
+- [Python 3.12](https://python.org)
+- [Hydrogram](https://hydrogram.org)
 - [humanfriendly](https://pypi.org/project/humanfriendly/)
 - [httpx](https://www.python-httpx.org/)
 - [TgCrypto](https://pypi.org/project/TgCrypto/)
