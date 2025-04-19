@@ -478,13 +478,31 @@ async def close_msg(bot: Client, query: CallbackQuery) -> None:
             await query.message.reply_to_message.delete()
     await query.message.delete()
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import asyncio
+import datetime
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(func=download_devices_job,
-                  trigger="interval",
-                  hours=3,
-                  next_run_time=datetime.datetime.now(),
-                  misfire_grace_time=None)
 
-scheduler.start()
-app.run()
+@app.on_message(filters.command("start"))
+async def start_msg(_: Client, message: Message) -> None:
+    print(f"Received /start from {message.from_user.id}")  # Debug
+    await message.reply_text("Hey there! Bliss Bot at your service.")
+
+async def start_scheduler():
+    loop = asyncio.get_event_loop()  # Ensures the loop is running
+    scheduler.add_job(
+        func=lambda: loop.create_task(download_devices_job()),
+        trigger="interval",
+        hours=3,
+        next_run_time=datetime.datetime.now(),
+        misfire_grace_time=None
+    )
+    scheduler.start()
+    print("Scheduler started")
+
+if __name__ == "__main__":
+    # Make sure the scheduler starts after the event loop is initialized
+    app.run()  # Start the bot (this will trigger event loop)
+    asyncio.run(start_scheduler())  # Safely start the scheduler after the loop is running
+
